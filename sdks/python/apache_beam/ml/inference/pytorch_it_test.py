@@ -33,6 +33,7 @@ from apache_beam.testing.test_pipeline import TestPipeline
 try:
   import torch
   from apache_beam.examples.inference import pytorch_image_classification
+  from apache_beam.examples.inference import pytorch_image_segmentation
 except ImportError as e:
   torch = None
 
@@ -111,6 +112,88 @@ class PyTorchInference(unittest.TestCase):
 
     self.assertEqual(FileSystems().exists(output_file), True)
     predictions = process_outputs(filepath=output_file)
+
+  @pytest.mark.it_postcommit
+  @pytest.mark.uses_pytorch
+  def test_image_segmentation_small(self):
+    test_pipeline = TestPipeline(is_integration_test=True)
+    output_file_dir = 'gs://apache-beam-ml/testing'
+    output_file = '/'.join(
+        [output_file_dir, 'predictions', str(uuid.uuid4()), 'result.txt'])
+    actuals_file = '/'.join([
+        output_file_dir,
+        'expected_outputs',
+        'torchvision_maskrcnn_resnet50_actuals.txt'
+    ])
+    file_of_image_names = 'gs://apache-beam-ml/datasets/coco/raw-data/annotations/instances_val2017.json'
+    base_output_files_dir = 'gs://apache-beam-ml/datasets/coco/raw-data/val2017'
+    filtered_image_ids = [
+        397133,
+        37777,
+        252219,
+        87038,
+        174482,
+        403385,
+        6818,
+        480985,
+        458054,
+        331352,
+        296649,
+        386912,
+        502136,
+        491497,
+        184791
+    ]
+
+    # State dict is obtained by saving the maskrcnn_resnet50_fpn(pretrained=True) model
+    model_path = 'gs://apache-beam-ml/models/torchvision.models.detection.maskrcnn_resnet50_fpn.pth'
+    extra_opts = {
+        'input': file_of_image_names,
+        'output': output_file,
+        'model_path': model_path,
+        'images_dir': base_output_files_dir,
+        'filtered_image_ids': ','.join((str(id) for id in filtered_image_ids))
+    }
+
+    pytorch_image_segmentation.run(
+        test_pipeline.get_full_options_as_args(**extra_opts),
+        save_main_session=False)
+
+    self.assertEqual(FileSystems().exists(output_file), True)
+    predictions = process_outputs(filepath=output_file)
+    actuals = process_outputs(filepath=actuals_file)
+
+    predictions_dict = {}
+    for prediction in predictions:
+      id, prediction_labels = prediction.split(';')
+      predictions_dict[id] = prediction_labels
+
+    for actual in actuals:
+      image_id, actual_labels = actual.split(';')
+      prediction_labels = predictions_dict[image_id]
+      self.assertEqual(actual_labels, prediction_labels)
+
+  @pytest.mark.inference_benchmark
+  @pytest.mark.no_xdist
+  @pytest.mark.timeout(2000)
+  @pytest.mark.uses_pytorch
+  def test_image_segmentation_benchmark(self):
+    test_pipeline = TestPipeline(is_integration_test=True)
+    file_of_image_names = 'gs://apache-beam-ml/datasets/coco/raw-data/annotations/instances_val2017.json'
+    base_output_files_dir = 'gs://apache-beam-ml/datasets/coco/raw-data/val2017'
+
+    # State dict is obtained by saving the maskrcnn_resnet50_fpn(pretrained=True) model
+    model_path = 'gs://apache-beam-ml/models/torchvision.models.detection.maskrcnn_resnet50_fpn.pth'
+    extra_opts = {
+        'input': file_of_image_names,
+        'model_path': model_path,
+        'images_dir': base_output_files_dir,
+        'n_examples': 5000
+    }
+
+    pytorch_image_segmentation.run(
+        test_pipeline.get_full_options_as_args(**extra_opts),
+        save_main_session=False)
 
 
 if __name__ == '__main__':

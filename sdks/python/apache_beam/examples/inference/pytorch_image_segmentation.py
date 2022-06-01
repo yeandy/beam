@@ -26,6 +26,7 @@ from typing import Tuple
 from typing import Union
 
 import apache_beam as beam
+import torch
 import torchvision
 from apache_beam.io.filesystems import FileSystems
 from apache_beam.ml.inference.api import PredictionResult
@@ -39,7 +40,8 @@ from PIL import Image
 from torchvision import transforms
 
 
-def read_image(image_id_name_tuple, path_to_dir: str):
+def read_image(image_id_name_tuple: Tuple[int, str],
+               path_to_dir: str = None) -> Tuple[int, str, Image.Image]:
   image_id, image_file_name = image_id_name_tuple
   image_file_name = os.path.join(path_to_dir, image_file_name)
   with FileSystems().open(image_file_name, 'r') as file:
@@ -47,7 +49,7 @@ def read_image(image_id_name_tuple, path_to_dir: str):
     return image_id, image_file_name, data
 
 
-def preprocess_data(data):
+def preprocess_data(data: Image) -> torch.Tensor:
   image_size = (800, 800)
   normalize = transforms.Normalize(
       mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])

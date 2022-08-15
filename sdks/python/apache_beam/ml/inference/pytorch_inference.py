@@ -41,20 +41,24 @@ __all__ = [
 def _load_model(
     model_class: torch.nn.Module, state_dict_path, device, **model_params):
   model = model_class(**model_params)
-  model.to(device)
-  file = FileSystems.open(state_dict_path, 'rb')
   try:
+    file = FileSystems.open(state_dict_path, 'rb')
     state_dict = torch.load(file, map_location=device)
   except RuntimeError as e:
-    if 'Attempting to deserialize object on a CUDA device' in e.message:
-      logging.warning("Deserialize state_dict exception. Setting to CPU.")
-      logging.warning(e.message)
-      print("Deserialize state_dict exception. Setting to CPU.")
-      print(e.message)
-      state_dict = torch.load(file, map_location='cpu')
-      model = model.to('cpu')
+    message = "Setting to CPU due to an exception while deserializing" \
+      f" state_dict_path. Exception: {e}."
+    logging.warning(message)
+    print(message)
+
+    device = torch.device('cpu')
+    file = FileSystems.open(state_dict_path, 'rb')
+    state_dict = torch.load(file, map_location=device)
+
   model.load_state_dict(state_dict)
+  model.to(device)
   model.eval()
+  logging.info("Finished loading model")
+  print("Finished loading model")
   return model
 
 

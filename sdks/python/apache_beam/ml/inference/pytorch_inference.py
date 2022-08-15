@@ -17,6 +17,7 @@
 
 # pytype: skip-file
 
+import logging
 from collections import defaultdict
 from typing import Any
 from typing import Callable
@@ -42,7 +43,15 @@ def _load_model(
   model = model_class(**model_params)
   model.to(device)
   file = FileSystems.open(state_dict_path, 'rb')
-  model.load_state_dict(torch.load(file))
+  try:
+    state_dict = torch.load(file, map_location=device)
+  except RuntimeError as e:
+    if 'Attempting to deserialize object on a CUDA device' in e.message:
+      logging.warning("Deserialize state_dict exception. Setting to CPU.")
+      logging.warning(e.message)
+      state_dict = torch.load(file, map_location='cpu')
+      model = model.to('cpu')
+  model.load_state_dict(state_dict)
   model.eval()
   return model
 
@@ -89,8 +98,12 @@ class PytorchModelHandlerTensor(ModelHandler[torch.Tensor,
     """
     self._state_dict_path = state_dict_path
     if device == 'GPU' and torch.cuda.is_available():
+      logging.info("Device is set to CUDA")
       self._device = torch.device('cuda')
     else:
+      if device == 'GPU':
+        logging.warning(
+            "Specified 'GPU', but could not find device. Switching to CPU.")
       self._device = torch.device('cpu')
     self._model_class = model_class
     self._model_params = model_params
@@ -189,8 +202,12 @@ class PytorchModelHandlerKeyedTensor(ModelHandler[Dict[str, torch.Tensor],
     """
     self._state_dict_path = state_dict_path
     if device == 'GPU' and torch.cuda.is_available():
+      logging.info("Device is set to CUDA")
       self._device = torch.device('cuda')
     else:
+      if device == 'GPU':
+        logging.warning(
+            "Specified 'GPU', but could not find device. Switching to CPU.")
       self._device = torch.device('cpu')
     self._model_class = model_class
     self._model_params = model_params

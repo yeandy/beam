@@ -41,7 +41,15 @@ __all__ = [
 def _load_model(
     model_class: torch.nn.Module, state_dict_path, device, **model_params):
   model = model_class(**model_params)
+
+  if device == torch.device('cuda') and not torch.cuda.is_available():
+    logging.warning(
+        "Specified 'GPU', but could not find device. Switching to CPU.")
+    print("Specified 'GPU', but could not find device. Switching to CPU.")
+    device = torch.device('cpu')
+
   try:
+    logging.error("!! Device: %s", device)
     file = FileSystems.open(state_dict_path, 'rb')
     state_dict = torch.load(file, map_location=device)
   except RuntimeError as e:
@@ -103,15 +111,23 @@ class PytorchModelHandlerTensor(ModelHandler[torch.Tensor,
     for details
     """
     self._state_dict_path = state_dict_path
-    if device == 'GPU' and torch.cuda.is_available():
+    # if device == 'GPU' and torch.cuda.is_available():
+    #   logging.info("Device is set to CUDA")
+    #   print("Device is set to CUDA")
+    #   self._device = torch.device('cuda')
+    # else:
+    #   if device == 'GPU':
+    #     logging.warning(
+    #         "Specified 'GPU', but could not find device. Switching to CPU.")
+    #     print("Specified 'GPU', but could not find device. Switching to CPU.")
+    #   self._device = torch.device('cpu')
+    if device == 'GPU':
       logging.info("Device is set to CUDA")
       print("Device is set to CUDA")
       self._device = torch.device('cuda')
     else:
-      if device == 'GPU':
-        logging.warning(
-            "Specified 'GPU', but could not find device. Switching to CPU.")
-        print("Specified 'GPU', but could not find device. Switching to CPU.")
+      logging.info("Device is set to CPU")
+      print("Device is set to CPU")
       self._device = torch.device('cpu')
     self._model_class = model_class
     self._model_params = model_params
@@ -209,15 +225,23 @@ class PytorchModelHandlerKeyedTensor(ModelHandler[Dict[str, torch.Tensor],
         Otherwise, it will be CPU.
     """
     self._state_dict_path = state_dict_path
-    if device == 'GPU' and torch.cuda.is_available():
+    # if device == 'GPU' and torch.cuda.is_available():
+    #   logging.info("Device is set to CUDA")
+    #   print("Device is set to CUDA")
+    #   self._device = torch.device('cuda')
+    # else:
+    #   if device == 'GPU':
+    #     logging.warning(
+    #         "Specified 'GPU', but could not find device. Switching to CPU.")
+    #     print("Specified 'GPU', but could not find device. Switching to CPU.")
+    #   self._device = torch.device('cpu')
+    if device == 'GPU':
       logging.info("Device is set to CUDA")
       print("Device is set to CUDA")
       self._device = torch.device('cuda')
     else:
-      if device == 'GPU':
-        logging.warning(
-            "Specified 'GPU', but could not find device. Switching to CPU.")
-        print("Specified 'GPU', but could not find device. Switching to CPU.")
+      logging.info("Device is set to CPU")
+      print("Device is set to CPU")
       self._device = torch.device('cpu')
     self._model_class = model_class
     self._model_params = model_params

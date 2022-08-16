@@ -293,6 +293,8 @@ class PytorchModelHandlerKeyedTensor(ModelHandler[Dict[str, torch.Tensor],
       batched_tensors = torch.stack(key_to_tensor_list[key])
       batched_tensors = _convert_to_device(batched_tensors, self._device)
       key_to_batched_tensors[key] = batched_tensors
+    logging.error("key_to_batched_tensors %s", key_to_batched_tensors)
+    logging.error("inference_args %s", inference_args)
     predictions = model(**key_to_batched_tensors, **inference_args)
     return [PredictionResult(x, y) for x, y in zip(batch, predictions)]
 

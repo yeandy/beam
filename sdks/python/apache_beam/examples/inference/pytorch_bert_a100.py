@@ -96,7 +96,11 @@ def tokenize_sentence(
     text_and_mask: Tuple[str, str]) -> Tuple[str, Dict[str, torch.Tensor]]:
   text, masked_text = text_and_mask
   tokenized_sentence = BERT_TOKENIZER.encode_plus(
-      masked_text, return_tensors="pt")
+      masked_text,
+      return_tensors="pt",
+      max_length=512,
+      truncation=True,
+      padding='max_length')
 
   # Workaround to manually remove batch dim until we have the feature to
   # add optional batching flag.
@@ -186,7 +190,7 @@ def run(argv=None, model_class=None, model_params=None, save_main_session=True):
     in the run_inference() call.
     """
     def batch_elements_kwargs(self):
-      return {'max_batch_size': 1}
+      return {'min_batch_size': 1, 'max_batch_size': 100}
 
   model_handler = PytorchNoBatchModelHandler(
       state_dict_path=known_args.model_state_dict_path,

@@ -167,11 +167,11 @@ class PytorchModelHandlerTensor(ModelHandler[torch.Tensor,
       An Iterable of type PredictionResult.
     """
     inference_args = {} if not inference_args else inference_args
-
-    batched_tensors = torch.stack(batch)
-    batched_tensors = _convert_to_device(batched_tensors, self._device)
-    predictions = model(batched_tensors, **inference_args)
-    return [PredictionResult(x, y) for x, y in zip(batch, predictions)]
+    with torch.no_grad():
+      batched_tensors = torch.stack(batch)
+      batched_tensors = _convert_to_device(batched_tensors, self._device)
+      predictions = model(batched_tensors, **inference_args)
+      return [PredictionResult(x, y) for x, y in zip(batch, predictions)]
 
   def get_num_bytes(self, batch: Sequence[torch.Tensor]) -> int:
     """
@@ -285,18 +285,17 @@ class PytorchModelHandlerKeyedTensor(ModelHandler[Dict[str, torch.Tensor],
     # If elements in `batch` are provided as a dictionaries from key to Tensors,
     # then iterate through the batch list, and group Tensors to the same key
     key_to_tensor_list = defaultdict(list)
-    for example in batch:
-      for key, tensor in example.items():
-        key_to_tensor_list[key].append(tensor)
-    key_to_batched_tensors = {}
-    for key in key_to_tensor_list:
-      batched_tensors = torch.stack(key_to_tensor_list[key])
-      batched_tensors = _convert_to_device(batched_tensors, self._device)
-      key_to_batched_tensors[key] = batched_tensors
-    logging.error("key_to_batched_tensors %s", key_to_batched_tensors)
-    logging.error("inference_args %s", inference_args)
-    predictions = model(**key_to_batched_tensors, **inference_args)
-    return [PredictionResult(x, y) for x, y in zip(batch, predictions)]
+    with torch.no_grad():
+      for example in batch:
+        for key, tensor in example.items():
+          key_to_tensor_list[key].append(tensor)
+      key_to_batched_tensors = {}
+      for key in key_to_tensor_list:
+        batched_tensors = torch.stack(key_to_tensor_list[key])
+        batched_tensors = _convert_to_device(batched_tensors, self._device)
+        key_to_batched_tensors[key] = batched_tensors
+      predictions = model(**key_to_batched_tensors, **inference_args)
+      return [PredictionResult(x, y) for x, y in zip(batch, predictions)]
 
   def get_num_bytes(self, batch: Sequence[torch.Tensor]) -> int:
     """
